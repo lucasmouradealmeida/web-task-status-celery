@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Status da Tarefa</title>
+    <script>
+        let taskHistory = [];
+        let statusIntervals = {}; // Armazenar intervalos de status por task_id
+
+        function startTask() {
+            fetch('/start-task', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    // Adiciona a tarefa no histórico
+                    taskHistory.push({ task_id: data.task_id, status: 'Aguardando...' });
+                    updateHistoryTable();
+
+                    // Inicia o processo de verificação do status da tarefa
+                    checkStatus(data.task_id);
+                });
+        }
+
+        function checkStatus(task_id) {
+            // Se já existe um intervalo para essa tarefa, não cria um novo
+            if (statusIntervals[task_id]) {
+                return;
+            }
+
+            // Cria um intervalo para verificar o status
+            statusIntervals[task_id] = setInterval(() => {
+                fetch(`/task-status/${task_id}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        // Atualiza o status da tarefa no histórico
+                        const task = taskHistory.find(task => task.task_id === task_id);
+                        if (task) {
+                            task.status = data.status;
+                            updateHistoryTable();
+
+                            // Se a tarefa foi finalizada, para o intervalo de verificação
+                            if (data.status === 'Finalizado') {
+                                clearInterval(statusIntervals[task_id]);
+                                delete statusIntervals[task_id]; // Limpa o intervalo do objeto
+                            }
+                        }
+                    });
+            }, 2000); // Intervalo de 2 segundos
+        }
+
+        function updateHistoryTable() {
+            const tableBody = document.getElementById('history-body');
+            tableBody.innerHTML = ''; // Limpa o corpo da tabela
+
+            taskHistory.forEach(task => {
+                const row = document.createElement('tr');
+                const cellId = document.createElement('td');
+                const cellStatus = document.createElement('td');
+
+                cellId.textContent = task.task_id;
+                cellStatus.textContent = task.status;
+
+                row.appendChild(cellId);
+                row.appendChild(cellStatus);
+                tableBody.appendChild(row);
+            });
+        }
+    </script>
+</head>
+<body>
+    <h1>Status da Tarefa</h1>
+    <button onclick="startTask()">Iniciar Tarefa</button>
+
+    <h2>Histórico de Tarefas</h2>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>ID da Tarefa</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="history-body">
+            <!-- As tarefas serão inseridas aqui -->
+        </tbody>
+    </table>
+</body>
+</html>
